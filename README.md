@@ -1,5 +1,8 @@
 # GTAIV Mod Kit
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
 Open-source toolkit for inspecting, extracting and modding **GTA IV (PS3)**
 archives and vehicle files — with a full CLI and an Arabic (RTL) GUI.
 
@@ -98,6 +101,63 @@ run_gui.py         GUI entry point
 gtaivkit_exe.py    CLI entry point (for PyInstaller)
 tests.py           test suite (94 checks)
 ```
+
+## Roadmap — what's missing / help wanted
+
+Concrete tasks for contributors who want to take this to professional grade.
+Anything here is a great first issue:
+
+1. **Mesh (WFT/CFT) payload conversion** — `WftFile.to_ps3()`/`to_pc()` only
+   re-tag the 12-byte RSC header and re-compress the payload *unchanged*.
+   Full PC↔PS3 conversion needs system/GPU segment layout, pointer tagging
+   and buffer-format handling, then a load test on console or RPCS3.
+   (Texture dicts *are* fully rebuilt and structurally verified against
+   retail files — use `wtd.build_ps3` as the reference pattern.)
+2. **Game-independent test fixtures** — `tests.py` reads your own game files
+   (`GAME`, `PC_IMG` constants). Generate tiny synthetic RPF/IMG/RSC fixtures
+   so the suite can run without any game data.
+3. **CI** — GitHub Actions: lint + tests on Windows/Linux/macOS. Blocked on
+   task 2; once fixtures exist, add `.github/workflows/ci.yml`.
+4. **Packaging** — add `pyproject.toml` with `console_scripts`
+   (`gtaivkit = gtaivkit.cli:main`), version single-sourced, installable via
+   `pipx install .`.
+5. **Release automation** — CI builds the PyInstaller executables
+   (`gtaivkit.exe` console, `GTAIVModKit.exe` windowed) and attaches them to
+   tagged releases with SHA-256 checksums.
+6. **More game formats** — AWC/RF64 audio containers, `.dat`/`.ide` meta
+   editors, particles, animations, collisions, and a RPF3 hash-collision
+   checker for `hashes.ini`.
+7. **GUI** — English localization (all strings are currently Arabic),
+   drag & drop, cancellable long operations, dark theme.
+8. **Code quality** — type hints + `mypy`, `ruff` formatting, docstrings on
+   public APIs, and replacing magic numbers with named constants
+   (the RSC/CTD field tables are documented in issues).
+9. **Console verification matrix** — document which cars/archives were tested
+   on real hardware vs RPCS3, with a smoke-test checklist for releases.
+10. **Docs** — architecture overview and format notes (RPF entry layout,
+    IMG3 header, RSC flag encoding, PS3 CTD struct table) in `docs/`.
+
+### Known limitations
+
+- Mesh conversion is experimental (task 1); textures are production-ready.
+- `.dat`/`.ide` text data files are copied verbatim, not parsed.
+- Windows is the primary target; the library itself is cross-platform but
+  only the CLI has been exercised outside Windows.
+
+## Contributing
+
+1. Fork and create a feature branch (`git checkout -b feature/my-thing`).
+2. Keep the golden rules:
+   - **Byte-identical round-trips** — read → write must reproduce the
+     original archive when nothing changed.
+   - **Magic guards** — never let a resource payload land in a plain
+     archive or vice versa.
+   - **Backups** — any in-place write gets a `.bak` first; writes are atomic
+     (`.tmp` + `os.replace`).
+3. Run `python tests.py` (all green) before opening a PR.
+4. Open a PR with a short description of the format/behaviour you touched.
+
+Issues labelled *help wanted* in the roadmap above are good starting points.
 
 ## ملاحظة بالعربية
 
