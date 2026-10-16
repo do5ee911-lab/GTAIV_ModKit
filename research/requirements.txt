@@ -1,0 +1,6 @@
+# Dependencies for decompilation and analysis
+pefile>=2023.2.7
+capstone>=5.0.0
+
+# Optional: for running the Python reimplementation
+pycryptodome>=3.19.0

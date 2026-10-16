@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+Thumbs.db
+
+# Large binary (original target — do not commit)
+GTAIV_Converter_by_TEAM_RageX.exe
+
+# Generated decompilation output (too large for git)
+DECOMPRESSED_CODE.c
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
