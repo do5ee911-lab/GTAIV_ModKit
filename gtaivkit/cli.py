@@ -6,16 +6,20 @@ import shutil
 import sys
 
 from . import aes
+from . import batch as batchmod
 from . import cars as carsmod
 from . import img as imgmod
 from . import manifest as manifestmod
 from . import rebuild as rebuildmod
 from . import rpf as rpfmod
+from . import rgxa as rgxamod
 from . import rsc as rscmod
+from . import tint as tintmod
 from . import wft as wftmod
 from . import wtd as wtdmod
 
 DEFAULT_GAME = r"C:\Users\_MO\Desktop\13\PS3_GAME\USRDIR"
+VERSION = "2.0.0"
 
 
 def open_archive(path):
@@ -360,11 +364,90 @@ def cmd_convert(args):
             "(got %s -> %s)" % (args.input, args.output))
 
 
+def cmd_convert_archive(args):
+    def progress(done, total, name):
+        print("  [%d/%d] %s" % (done, total, name))
+    try:
+        rep = batchmod.convert_archive(
+            args.archive, args.pc, out_path=args.out,
+            textures_only=args.textures_only, only=args.only,
+            backup=not args.no_backup, progress=progress,
+            max_dec_bytes=(int(args.max_dec_mb * 1024 * 1024)
+                           if args.max_dec_mb > 0 else None))
+    except ValueError as exc:
+        raise SystemExit("error: %s" % exc)
+    for line in batchmod.report_lines(rep):
+        print(line)
+    if not rep["written"]:
+        raise SystemExit("error: nothing converted (no matching PC sources)")
+
+
+def cmd_rgxa_pack(args):
+    with open(args.input, "rb") as fh:
+        raw = fh.read()
+    packed = rgxamod.pack_rgxa(raw)
+    with open(args.output, "wb") as fh:
+        fh.write(packed)
+    print("packed %s -> %s (%d bytes, raw %d)" %
+          (args.input, args.output, len(packed), len(raw)))
+
+
+def cmd_rgxa_unpack(args):
+    with open(args.input, "rb") as fh:
+        data = fh.read()
+    raw = rgxamod.unpack_rgxa(data)
+    with open(args.output, "wb") as fh:
+        fh.write(raw)
+    print("unpacked %s -> %s (%d bytes, packed %d)" %
+          (args.input, args.output, len(raw), len(data)))
+
+
+def cmd_tint_hash(args):
+    h = tintmod.fnv_shader_hash(args.name)
+    print("shader hash for %r: 0x%08X (%d)" % (args.name, h, h))
+
+
+def cmd_tint_inject(args):
+    wft = wftmod.WftFile.load(args.input)
+    tint = tuple(args.color) if args.color else (1.0, 1.0, 1.0, 1.0)
+    result = wft.inject_tint(tint)
+    cft = wft.to_ps3()
+    with open(args.output, "wb") as fh:
+        fh.write(cft)
+    print("injected tint into %s -> %s" % (args.input, args.output))
+    print("  shader renames: %d" % len(result["renamed"]))
+    for old, new in result["renamed"]:
+        print("    %s -> %s" % (old, new))
+    print("  tints patched: %d" % result["patched"])
+
+
+def cmd_tint_classify(args):
+    with open(args.input, "rb") as fh:
+        data = fh.read()
+    rsc = rscmod.RscFile.from_bytes(data, args.input)
+    dec = rsc.decompressed
+    if len(dec) < 0x70:
+        raise SystemExit("error: WFT too small")
+    header_size = struct.unpack_from("<I", dec, 0x00)[0]
+    drawable_table_off = struct.unpack_from("<I", dec, 0x14)[0] & 0x0FFFFFFF
+    drawable_count = struct.unpack_from("<I", dec, 0x18)[0]
+    if drawable_count > 0x100:
+        raise SystemExit("error: bad drawable count %d" % drawable_count)
+    cats = tintmod.classify_drawables(dec, drawable_table_off, drawable_count)
+    print("classified %d drawables in %s:" % (drawable_count, args.input))
+    for cat, items in cats.items():
+        if items:
+            print("  %s (%d):" % (cat, len(items)))
+            for idx, name in items:
+                print("    [%d] %s" % (idx, name))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="gtaivkit",
-                                description="GTA IV PS3 archive toolkit")
+                                description="GTA IV PS3 archive toolkit v%s" % VERSION)
     p.add_argument("--game", default=DEFAULT_GAME,
                    help="path to USRDIR (default: %(default)s)")
+    p.add_argument("--version", action="version", version="gtaivkit %s" % VERSION)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     k = sub.add_parser("key", help="show the extracted AES key")
@@ -451,6 +534,53 @@ def build_parser():
     cv.add_argument("input")
     cv.add_argument("output")
     cv.set_defaults(fn=cmd_convert)
+
+    ca = sub.add_parser(
+        "convert-archive",
+        help="convert every car inside a PS3 IMG directly from a PC IMG "
+             "(no unpacking)")
+    ca.add_argument("archive", help="PS3 vehicles.img (encrypted or not)")
+    ca.add_argument("--pc", required=True, help="PC vehicles.img with sources")
+    ca.add_argument("-o", "--out",
+                    help="write to a different file (default: in place)")
+    ca.add_argument("--textures-only", action="store_true",
+                    help="keep retail PS3 meshes; convert textures only "
+                         "(guaranteed to run in game)")
+    ca.add_argument("--only", nargs="*",
+                    help="car names to convert (default: all)")
+    ca.add_argument("--max-dec-mb", type=float, default=4.0, metavar="MB",
+                    help="skip texture dicts whose decompressed size "
+                         "exceeds this many MB (default: 4; 0 = no limit). "
+                         "Guards against HD mods that black-screen the PS3")
+    ca.add_argument("--no-backup", action="store_true")
+    ca.set_defaults(fn=cmd_convert_archive)
+
+    rg = sub.add_parser("rgxa", help="RGXA resource pack/unpack")
+    rgsub = rg.add_subparsers(dest="rgxa_cmd", required=True)
+    rgp = rgsub.add_parser("pack", help="pack raw data into RGXA")
+    rgp.add_argument("input")
+    rgp.add_argument("output")
+    rgp.set_defaults(fn=cmd_rgxa_pack)
+    rgu = rgsub.add_parser("unpack", help="unpack RGXA to raw data")
+    rgu.add_argument("input")
+    rgu.add_argument("output")
+    rgu.set_defaults(fn=cmd_rgxa_unpack)
+
+    tn = sub.add_parser("tint", help="shader tint injection tools")
+    tnsub = tn.add_subparsers(dest="tint_cmd", required=True)
+    th = tnsub.add_parser("hash", help="compute shader name hash")
+    th.add_argument("name")
+    th.set_defaults(fn=cmd_tint_hash)
+    ti = tnsub.add_parser("inject", help="inject tint into WFT and convert to CFT")
+    ti.add_argument("input")
+    ti.add_argument("output")
+    ti.add_argument("--color", nargs=4, type=float, metavar=("R", "G", "B", "A"),
+                    help="tint color as 4 floats (default: 1 1 1 1)")
+    ti.set_defaults(fn=cmd_tint_inject)
+    tc = tnsub.add_parser("classify", help="classify drawables in a WFT")
+    tc.add_argument("file")
+    tc.set_defaults(fn=cmd_tint_classify)
+
     return p
 
 
@@ -467,7 +597,7 @@ def main(argv=None):
     parser = build_parser()
     if not argv:
         print("=" * 56)
-        print("  GTAIV MOD KIT  -  GTA IV PS3 archive & car mod toolkit")
+        print("  GTAIV MOD KIT v%s  -  GTA IV PS3 archive & car mod toolkit" % VERSION)
         print("=" * 56)
         print("Default game dir : %s" % DEFAULT_GAME)
         print("Game dir present : %s" % ("yes" if os.path.isdir(DEFAULT_GAME) else "NOT FOUND"))
@@ -480,6 +610,8 @@ def main(argv=None):
         print("  gtaivkit cars list")
         print("  gtaivkit convert mod.wtd mod.ctd")
         print("  gtaivkit cars install C:\\mymods")
+        print("  gtaivkit rgxa pack raw.bin packed.rgxa")
+        print("  gtaivkit tint inject model.wft model.cft --color 1 0 0 1")
         print("  gtaivkit rebuild common.rpf extracted")
         print()
         parser.print_help()

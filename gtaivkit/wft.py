@@ -1,13 +1,13 @@
 from .rsc import (RscError, RscFile, TYPE_MODEL_PC, TYPE_MODEL_PS3,
                   decode_flags)
+from . import tint as tintmod
+import struct
 
 
 class WftFile:
     __slots__ = ("rsc",)
 
     def __init__(self, rsc):
-        if rsc.type not in (TYPE_MODEL_PC, TYPE_MODEL_PS3):
-            pass
         self.rsc = rsc
 
     @classmethod
@@ -58,3 +58,16 @@ class WftFile:
         if not self.rsc.is_ps3:
             return self.rsc.raw
         return self.rsc.build_pc(type_=TYPE_MODEL_PC)
+
+    def inject_tint(self, tint_color=(1.0, 1.0, 1.0, 1.0)):
+        if self.rsc.is_ps3:
+            raise RscError("tint injection is PC-only; convert to PS3 first")
+        dec = bytearray(self.rsc.decompressed)
+        renamed = tintmod.patch_shader_names(dec, 0, len(dec))
+        patched = 0
+        for i in range(len(dec) - 0x20):
+            if struct.unpack_from("<I", dec, i)[0] == 0xEC896300:
+                if tintmod.inject_tint_params(dec, i, tint_color):
+                    patched += 1
+        self.rsc.decompressed = bytes(dec)
+        return {"renamed": renamed, "patched": patched}

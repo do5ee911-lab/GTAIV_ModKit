@@ -7,62 +7,130 @@ import traceback
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from . import aes
+from . import batch as batchmod
 from . import cars as carsmod
 from . import img as imgmod
 from . import manifest as manifestmod
 from . import rebuild as rebuildmod
 from . import rpf as rpfmod
+from . import rgxa as rgxamod
 from . import rsc as rscmod
+from . import tint as tintmod
 from . import wft as wftmod
 from . import wtd as wtdmod
 
 APP_NAME = "GTAIV Mod Kit"
+APP_VERSION = "2.0.0"
 DEFAULT_GAME = r"C:\Users\_MO\Desktop\13\PS3_GAME\USRDIR"
 LTR = "‎"
 
-NAVY = "#141c33"
-NAVY_DARK = "#0f1526"
-PANEL = "#1b2542"
-PANEL_HI = "#243156"
-BORDER = "#2c3a63"
+# ── Premium dark-glass palette ──────────────────────────────────────────────
+BG = "#0b0e14"
+BG2 = "#111522"
+PANEL = "#151b2b"
+PANEL2 = "#1a2240"
+BORDER = "#232e4d"
+BORDER2 = "#2e3d66"
 GOLD = "#d4af37"
 GOLD_HI = "#f0d878"
+ACCENT = "#5b8cff"
+ACCENT2 = "#7c5bff"
 TEXT = "#e8eaf0"
-MUTED = "#9aa7c7"
+MUTED = "#8a95b5"
 DANGER = "#e05c5c"
-OK = "#5cd48a"
+OK = "#4cd964"
+WARN = "#f0a030"
 
 QSS = """
-QMainWindow, QWidget#root { background: %(navy)s; color: %(text)s; font-family: 'Segoe UI'; font-size: 13px; }
-QFrame#sidebar { background: %(dark)s; border-left: 1px solid %(border)s; }
-QLabel#title { font-size: 20px; font-weight: 700; color: %(gold)s; }
+QMainWindow, QWidget#root {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %(bg2)s, stop:1 %(bg)s);
+    color: %(text)s;
+    font-family: 'Segoe UI', 'Cairo', sans-serif;
+    font-size: 13px;
+}
+QFrame#sidebar {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0d1020, stop:1 #080a12);
+    border-right: 1px solid %(border)s;
+}
+QLabel#title { font-size: 22px; font-weight: 800; color: %(gold)s; letter-spacing: 0.5px; }
 QLabel#subtitle { color: %(muted)s; font-size: 12px; }
-QLabel#card { background: %(panel)s; border: 1px solid %(border)s; border-radius: 10px; padding: 12px; }
-QLabel#stat { color: %(gold)s; font-size: 15px; font-weight: 600; }
-QPushButton { background: %(panel)s; border: 1px solid %(border)s; border-radius: 6px; padding: 7px 14px; color: %(text)s; }
-QPushButton:hover { background: %(panel_hi)s; border-color: %(gold)s; }
-QPushButton:pressed { background: %(dark)s; }
-QPushButton#primary { background: %(gold)s; color: #101010; font-weight: 700; border: none; }
+QLabel#card {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 %(panel)s, stop:1 %(panel2)s);
+    border: 1px solid %(border)s;
+    border-radius: 12px;
+    padding: 14px;
+}
+QLabel#stat { color: %(gold)s; font-size: 16px; font-weight: 700; }
+QLabel#badge {
+    background: %(accent)s; color: white; border-radius: 8px;
+    padding: 3px 10px; font-size: 11px; font-weight: 700;
+}
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %(panel)s, stop:1 %(panel2)s);
+    border: 1px solid %(border)s;
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: %(text)s;
+}
+QPushButton:hover { border-color: %(gold)s; background: %(panel2)s; }
+QPushButton:pressed { background: %(bg)s; }
+QPushButton#primary {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %(gold_hi)s, stop:1 %(gold)s);
+    color: #101010; font-weight: 800; border: none;
+}
 QPushButton#primary:hover { background: %(gold_hi)s; }
+QPushButton#accent {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %(accent)s, stop:1 %(accent2)s);
+    color: white; font-weight: 700; border: none;
+}
+QPushButton#accent:hover { opacity: 0.9; filter: brightness(1.15); }
 QPushButton#danger { border-color: %(danger)s; color: %(danger)s; }
-QPushButton#nav { text-align: right; border: none; border-radius: 0; padding: 13px 16px; background: transparent; font-size: 14px; }
+QPushButton#nav {
+    text-align: right; border: none; border-radius: 0;
+    padding: 14px 18px; background: transparent; font-size: 14px;
+}
 QPushButton#nav:hover { background: %(panel)s; }
-QPushButton#nav:checked { background: %(panel)s; color: %(gold)s; border-right: 3px solid %(gold)s; font-weight: 700; }
-QTableWidget { background: %(dark)s; gridline-color: %(border)s; alternate-background-color: #16203a; border: 1px solid %(border)s; border-radius: 6px; }
-QHeaderView::section { background: %(panel)s; color: %(gold)s; border: none; padding: 7px; font-weight: 600; }
-QTableWidget::item:selected { background: %(panel_hi)s; color: %(text)s; }
-QLineEdit, QComboBox, QPlainTextEdit { background: %(dark)s; border: 1px solid %(border)s; border-radius: 5px; padding: 6px 8px; selection-background-color: %(panel_hi)s; }
+QPushButton#nav:checked {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 %(panel)s, stop:1 transparent);
+    color: %(gold)s; border-right: 3px solid %(gold)s; font-weight: 700;
+}
+QTableWidget {
+    background: %(bg)s; gridline-color: %(border)s;
+    alternate-background-color: #121828;
+    border: 1px solid %(border)s; border-radius: 8px;
+}
+QHeaderView::section {
+    background: %(panel2)s; color: %(gold)s; border: none;
+    padding: 8px; font-weight: 700;
+}
+QTableWidget::item:selected { background: %(panel2)s; color: %(text)s; }
+QLineEdit, QComboBox, QPlainTextEdit {
+    background: %(bg)s; border: 1px solid %(border)s;
+    border-radius: 6px; padding: 7px 10px;
+    selection-background-color: %(panel2)s;
+}
 QLineEdit:focus { border-color: %(gold)s; }
-QStatusBar { background: %(dark)s; color: %(muted)s; border-top: 1px solid %(border)s; }
+QStatusBar {
+    background: %(bg2)s; color: %(muted)s;
+    border-top: 1px solid %(border)s;
+}
 QCheckBox { spacing: 8px; }
 QCheckBox::indicator { width: 16px; height: 16px; }
 QProgressDialog { background: %(panel)s; }
-QScrollBar:vertical { background: %(dark)s; width: 10px; }
-QScrollBar::handle:vertical { background: %(border)s; border-radius: 4px; min-height: 30px; }
+QScrollBar:vertical { background: %(bg)s; width: 10px; }
+QScrollBar::handle:vertical { background: %(border2)s; border-radius: 4px; min-height: 30px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-""" % {"navy": NAVY, "dark": NAVY_DARK, "panel": PANEL, "panel_hi": PANEL_HI,
-       "border": BORDER, "gold": GOLD, "gold_hi": GOLD_HI, "text": TEXT,
-       "muted": MUTED, "danger": DANGER}
+QTabWidget::pane { border: 1px solid %(border)s; border-radius: 8px; }
+QTabBar::tab {
+    background: %(panel)s; color: %(muted)s; padding: 8px 16px;
+    border: 1px solid %(border)s; border-bottom: none;
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+}
+QTabBar::tab:selected { background: %(panel2)s; color: %(gold)s; font-weight: 700; }
+""" % {"bg": BG, "bg2": BG2, "panel": PANEL, "panel2": PANEL2,
+       "border": BORDER, "border2": BORDER2, "gold": GOLD, "gold_hi": GOLD_HI,
+       "accent": ACCENT, "accent2": ACCENT2, "text": TEXT, "muted": MUTED,
+       "danger": DANGER, "ok": OK, "warn": WARN}
 
 
 def ltr(text):
@@ -147,17 +215,20 @@ class Sidebar(QtWidgets.QWidget):
     def __init__(self, entries, on_nav):
         super().__init__()
         self.setObjectName("sidebar")
-        self.setFixedWidth(210)
+        self.setFixedWidth(220)
         lay = QtWidgets.QVBoxLayout(self)
-        lay.setContentsMargins(0, 18, 0, 18)
+        lay.setContentsMargins(0, 20, 0, 20)
         lay.setSpacing(2)
         brand = QtWidgets.QLabel("  GTA IV")
-        brand.setStyleSheet("color: %s; font-size: 22px; font-weight: 800;" % GOLD)
+        brand.setStyleSheet("color: %s; font-size: 24px; font-weight: 900;" % GOLD)
         brand2 = QtWidgets.QLabel("  MOD KIT")
-        brand2.setStyleSheet("color: %s; font-size: 13px; letter-spacing: 3px;" % MUTED)
+        brand2.setStyleSheet("color: %s; font-size: 12px; letter-spacing: 4px;" % MUTED)
+        ver_badge = QtWidgets.QLabel("  v%s" % APP_VERSION)
+        ver_badge.setStyleSheet("color: %s; font-size: 11px;" % ACCENT)
         lay.addWidget(brand)
         lay.addWidget(brand2)
-        lay.addSpacing(18)
+        lay.addWidget(ver_badge)
+        lay.addSpacing(20)
         self.group = QtWidgets.QButtonGroup(self)
         self.group.setExclusive(True)
         for i, (key, label) in enumerate(entries):
@@ -170,8 +241,8 @@ class Sidebar(QtWidgets.QWidget):
             if i == 0:
                 btn.setChecked(True)
         lay.addStretch(1)
-        ver = QtWidgets.QLabel("  v1.0")
-        ver.setStyleSheet("color: %s;" % MUTED)
+        ver = QtWidgets.QLabel("  Built with RageX findings")
+        ver.setStyleSheet("color: %s; font-size: 10px;" % MUTED)
         lay.addWidget(ver)
         self.group.idClicked.connect(on_nav)
 
@@ -180,8 +251,8 @@ class HomePage(QtWidgets.QWidget):
     def __init__(self, win):
         super().__init__()
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
-        root.setSpacing(14)
+        root.setContentsMargins(32, 28, 32, 28)
+        root.setSpacing(16)
         title = QtWidgets.QLabel("الرئيسية")
         title.setObjectName("title")
         sub = QtWidgets.QLabel("حالة الأداة واللعبة — كل شيء جاهز للتعديل")
@@ -190,7 +261,7 @@ class HomePage(QtWidgets.QWidget):
         root.addWidget(sub)
 
         row = QtWidgets.QHBoxLayout()
-        row.setSpacing(14)
+        row.setSpacing(16)
         card_dir = QtWidgets.QWidget()
         card_dir.setObjectName("card")
         cd = QtWidgets.QVBoxLayout(card_dir)
@@ -226,7 +297,7 @@ class HomePage(QtWidgets.QWidget):
         actions = QtWidgets.QHBoxLayout()
         actions.setSpacing(12)
         for label, page in ((" السيارات ←", 2), (" الأرشيفات ←", 1),
-                            (" التحويل ←", 3)):
+                            (" التحويل ←", 3), (" الحقن والتصنيف ←", 4)):
             b = QtWidgets.QPushButton(label)
             b.setCursor(QtGui.Qt.CursorShape.PointingHandCursor)
             b.clicked.connect(lambda _=False, p=page: win.nav(p))
@@ -249,7 +320,7 @@ class ArchivesPage(QtWidgets.QWidget):
         self.arc = None
         self.path = ""
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
+        root.setContentsMargins(32, 28, 32, 28)
         root.setSpacing(12)
         title = QtWidgets.QLabel("الأرشيفات")
         title.setObjectName("title")
@@ -620,7 +691,7 @@ class CarsPage(QtWidgets.QWidget):
         self.win = win
         self.cars = {}
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
+        root.setContentsMargins(32, 28, 32, 28)
         root.setSpacing(12)
         title = QtWidgets.QLabel("السيارات")
         title.setObjectName("title")
@@ -818,7 +889,7 @@ class ConvertPage(QtWidgets.QWidget):
         self.rsc = None
         self.textures = []
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
+        root.setContentsMargins(32, 28, 32, 28)
         root.setSpacing(12)
         title = QtWidgets.QLabel("التحويل والمستكشف")
         title.setObjectName("title")
@@ -869,6 +940,200 @@ class ConvertPage(QtWidgets.QWidget):
         bar.addWidget(b_conv)
         root.addLayout(bar)
 
+        sep = QtWidgets.QLabel(
+            "<b>تحويل vehicles.img كاملاً من نسخة PC — بدون فكّ</b>")
+        sep.setObjectName("subtitle")
+        root.addWidget(sep)
+
+        row1 = QtWidgets.QHBoxLayout()
+        row1.setSpacing(8)
+        self.arc_src = QtWidgets.QLineEdit(os.path.join(
+            win.game_dir, carsmod.VEHICLES_IMG.replace("/", os.sep)))
+        self.arc_src.setLayoutDirection(
+            QtCore.Qt.LayoutDirection.LeftToRight)
+        self.arc_pc = QtWidgets.QLineEdit()
+        self.arc_pc.setPlaceholderText(
+            "مسار vehicles.img من نسخة PC (المصدر) ...")
+        self.arc_pc.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        b_a1 = QtWidgets.QPushButton("استعراض")
+        b_a2 = QtWidgets.QPushButton("استعراض")
+        b_a1.clicked.connect(
+            lambda: self.pick_img(self.arc_src, "اختر أرشيف vehicles.img PS3"))
+        b_a2.clicked.connect(
+            lambda: self.pick_img(self.arc_pc, "اختر vehicles.img نسخة PC"))
+        row1.addWidget(QtWidgets.QLabel("أرشيف PS3:"))
+        row1.addWidget(self.arc_src, 1)
+        row1.addWidget(b_a1)
+        row1.addWidget(QtWidgets.QLabel("أرشيف PC:"))
+        row1.addWidget(self.arc_pc, 1)
+        row1.addWidget(b_a2)
+        root.addLayout(row1)
+
+        row2 = QtWidgets.QHBoxLayout()
+        row2.setSpacing(10)
+        self.arc_texonly = QtWidgets.QCheckBox(
+            "نسيج فقط — آمن 100% (يبقي مجسم اللعبة الأصلي)")
+        self.arc_texonly.setChecked(True)
+        self.arc_backup = QtWidgets.QCheckBox("نسخة احتياطية (.bak)")
+        self.arc_backup.setChecked(True)
+        b_go = QtWidgets.QPushButton("تحويل الأرشيف كاملاً")
+        b_go.setObjectName("primary")
+        b_go.setCursor(QtGui.Qt.CursorShape.PointingHandCursor)
+        b_go.clicked.connect(self.convert_archive)
+        row2.addWidget(self.arc_texonly)
+        row2.addWidget(self.arc_backup)
+        row2.addStretch(1)
+        row2.addWidget(b_go)
+        root.addLayout(row2)
+
+    def pick_img(self, edit, title):
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, title, self.win.game_dir, "GTA IV IMG (*.img);;All (*)")
+        if path:
+            edit.setText(path)
+
+    def convert_archive(self):
+        ps3 = self.arc_src.text().strip()
+        pc = self.arc_pc.text().strip()
+        if not os.path.isfile(ps3):
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه", "أرشيف PS3 غير موجود")
+            return
+        if not os.path.isfile(pc):
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه", "اختر أرشيف vehicles.img من نسخة PC أولاً")
+            return
+        if os.path.normcase(ps3) == os.path.normcase(pc):
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه", "الملفان متطابقان — اختر ملف PC مختلفاً")
+            return
+        try:
+            src_arc = imgmod.ImgArchive(ps3)
+            pc_arc = imgmod.ImgArchive(pc)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(
+                self, "خطأ", "تعذّر فتح أحد الأرشيفين:\n%s" % exc)
+            return
+        ps3_exts = {os.path.splitext(e.name)[1].lower()
+                    for e in src_arc.entries}
+        pc_exts = {os.path.splitext(e.name)[1].lower()
+                   for e in pc_arc.entries}
+        if not ps3_exts & {".ctd", ".cft"}:
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه",
+                "الملف في خانة «أرشيف PS3» لا يحتوي ملفات ctd/cft — "
+                "يبدو أنه نسخة PC.\nبدّل الخانتين وحاول مجدداً.")
+            return
+        if not pc_exts & {".wtd", ".wft"}:
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه",
+                "الملف في خانة «أرشيف PC» لا يحتوي ملفات wtd/wft — "
+                "يبدو أنه أرشيف PS3.\nبدّل الخانتين وحاول مجدداً.")
+            return
+        pc_names = {e.name.lower() for e in pc_arc.entries}
+
+        def _has_src(e):
+            stem = os.path.splitext(e.name)[0].lower()
+            want = ".wtd" if e.name.lower().endswith(".ctd") else ".wft"
+            return (stem + want) in pc_names
+        cand = [e for e in src_arc.entries
+                if os.path.splitext(e.name)[1].lower() in (".ctd", ".cft")]
+        n_ctd = sum(1 for e in cand
+                    if e.name.lower().endswith(".ctd") and _has_src(e))
+        n_cft = sum(1 for e in cand
+                    if e.name.lower().endswith(".cft") and _has_src(e))
+        if n_ctd + n_cft == 0:
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه",
+                "لا توجد أي سيارة متطابقة بين الأرشيفين —\n"
+                "تأكد أن ملف PC من نفس اللعبة وأنه vehicles.img.")
+            return
+        tex_only = self.arc_texonly.isChecked()
+        if not tex_only:
+            ans = QtWidgets.QMessageBox.question(
+                self, "تأكيد",
+                "وضع المجسم التجريبي قد يعطل اللعبة "
+                "(شاشة سوداء عند التشغيل على PS3).\n\n"
+                "هل تريد المتابعة به؟\n"
+                "الوضع الآمن: فعّل «نسيج فقط».",
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No)
+            if ans != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+        out, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "احفظ الأرشيف المحوّر", ps3, "GTA IV IMG (*.img)")
+        if not out:
+            return
+        if os.path.normcase(os.path.abspath(out)) == \
+                os.path.normcase(os.path.abspath(pc)):
+            QtWidgets.QMessageBox.warning(
+                self, "تنبيه",
+                "لا يمكن حفظ الناتج فوق ملف PC المصدر — اختر مساراً آخر.")
+            return
+        backup = self.arc_backup.isChecked() and \
+            os.path.normcase(out) == os.path.normcase(ps3)
+        n_job = n_ctd + (0 if tex_only else n_cft)
+
+        def job():
+            return batchmod.convert_archive(
+                ps3, pc, out_path=out, textures_only=tex_only,
+                backup=backup)
+
+        def ok(rep):
+            details = "\n".join(self._archive_rows(rep))
+            box = QtWidgets.QMessageBox(self)
+            box.setIcon(
+                QtWidgets.QMessageBox.Icon.Information if rep["converted"]
+                else QtWidgets.QMessageBox.Icon.Warning)
+            box.setWindowTitle("اكتمل التحويل")
+            mode = ("نسيج فقط (آمن — مجسم اللعبة الأصلي)" if rep["textures_only"]
+                    else "نسيج + مجسم (المجسم تجريبي — تحقق على الجهاز)")
+            text = (
+                "تم تحويل %d ملفاً (قوام: %d، مجسم: %d) — محفوظ: %d\n"
+                "الوضع: %s\n"
+                "حجم الأرشيف: %s ← %s\n"
+                "الناتج: %s" % (
+                    rep["converted"], rep["textures"], rep["meshes"],
+                    rep["kept"], mode,
+                    batchmod.fmt_size(rep["size_before"]),
+                    batchmod.fmt_size(rep["size_after"]),
+                    os.path.basename(rep["out"])))
+            if rep.get("skipped"):
+                text += ("\n\nتم تخطي %d نسيج بسبب حجمه الكبير جداً على PS3 "
+                         "(يبقى نسيج اللعبة الأصلي لهذه السيارات — "
+                         "الوضع الافتراضي الآمن)." % rep["skipped"])
+            if not rep["textures_only"] and rep["meshes"]:
+                text += ("\n\nتنبيه: المجسم تجريبي — إن لم تدخل اللعبة أو "
+                         "ظهرت سيارات مكسورة، أعد التحويل بوضع «نسيج فقط».")
+            box.setText(text)
+            box.setDetailedText(details)
+            box.exec()
+            self.win.status(
+                "التحويل اكتمل: %s ← %s" % (
+                    batchmod.fmt_size(rep["size_before"]),
+                    batchmod.fmt_size(rep["size_after"])))
+
+        run_async(self, job, ok,
+                  busy="جارٍ تحويل %d ملفاً داخل vehicles.img..." % n_job)
+
+    @staticmethod
+    def _archive_rows(rep):
+        lines = []
+        for r in rep["files"]:
+            if r["status"] == "kept-retail":
+                continue
+            extra = ""
+            if r["status"] == "skipped-too-big" and r.get("dec"):
+                extra = " — الحجم بعد الفكّ: %s" % batchmod.fmt_size(r["dec"])
+            lines.append("%s — %s  (%s → %s)%s" % (
+                r["name"],
+                batchmod._STATUS_AR.get(r["status"], r["status"]),
+                batchmod.fmt_size(r["before"]),
+                batchmod.fmt_size(r["after"]),
+                extra))
+        return lines
+
     def open_dialog(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "اختر ملف GTA IV", self.win.game_dir,
@@ -896,10 +1161,12 @@ class ConvertPage(QtWidgets.QWidget):
         plat_col = OK if self.rsc.is_ps3 else GOLD
         self.info.setText(
             "<b>المنصة:</b> <span style='color:%s'>%s</span> &nbsp;|&nbsp; "
-            "<b>النوع:</b> %d &nbsp;|&nbsp; <b>System:</b> %s &nbsp;|&nbsp; "
+            "<b>النوع:</b> %d &nbsp;|&nbsp; <b>الحجم:</b> %s &nbsp;|&nbsp; "
+            "<b>System:</b> %s &nbsp;|&nbsp; "
             "<b>GPU:</b> %s &nbsp;|&nbsp; <b>الناتج:</b> %s<br>"
             "<b>النصائر:</b> %d" % (
                 plat_col, plat, self.rsc.type,
+                fmt_size(os.path.getsize(path)),
                 fmt_size(self.rsc.system_size), fmt_size(self.rsc.gpu_size),
                 fmt_size(len(self.rsc.decompressed)), len(self.textures)))
         self.table.setRowCount(0)
@@ -915,7 +1182,8 @@ class ConvertPage(QtWidgets.QWidget):
                     item.setTextAlignment(
                         int(QtCore.Qt.AlignmentFlag.AlignCenter))
                 self.table.setItem(i, col, item)
-        self.win.status("تم تحميل %s" % os.path.basename(path))
+        self.win.status("تم تحميل %s (%s)" % (
+            os.path.basename(path), fmt_size(os.path.getsize(path))))
 
     def extract_dds(self):
         if not self.rsc or not self.textures:
@@ -1000,12 +1268,224 @@ class ConvertPage(QtWidgets.QWidget):
                 self, "تنبيه", "التحويل متاح من WTD أو WFT فقط (PC → PS3)")
 
 
+class TintPage(QtWidgets.QWidget):
+    def __init__(self, win):
+        super().__init__()
+        self.win = win
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(32, 28, 32, 28)
+        root.setSpacing(12)
+        title = QtWidgets.QLabel("الحقن والتصنيف")
+        title.setObjectName("title")
+        sub = QtWidgets.QLabel(
+            "حقن الألوان (tint) في المجسمات وتصنيف القطع — من نتائج فك شفرة RageX")
+        sub.setObjectName("subtitle")
+        root.addWidget(title)
+        root.addWidget(sub)
+
+        tabs = QtWidgets.QTabWidget()
+
+        # ── Tint Inject tab ──────────────────────────────────────────────
+        inject_tab = QtWidgets.QWidget()
+        il = QtWidgets.QVBoxLayout(inject_tab)
+        il.setSpacing(10)
+        il.setContentsMargins(16, 16, 16, 16)
+        row1 = QtWidgets.QHBoxLayout()
+        self.wft_edit = QtWidgets.QLineEdit()
+        self.wft_edit.setPlaceholderText("ملف .wft (PC) للحقن...")
+        self.wft_edit.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        b_pick = QtWidgets.QPushButton("استعراض")
+        b_pick.clicked.connect(self.pick_wft)
+        row1.addWidget(self.wft_edit, 1)
+        row1.addWidget(b_pick)
+        il.addLayout(row1)
+
+        color_row = QtWidgets.QHBoxLayout()
+        color_row.setSpacing(8)
+        color_row.addWidget(QtWidgets.QLabel("اللون:"))
+        self.r_spin = QtWidgets.QDoubleSpinBox()
+        self.r_spin.setRange(0.0, 1.0)
+        self.r_spin.setValue(1.0)
+        self.r_spin.setSingleStep(0.1)
+        self.g_spin = QtWidgets.QDoubleSpinBox()
+        self.g_spin.setRange(0.0, 1.0)
+        self.g_spin.setValue(1.0)
+        self.g_spin.setSingleStep(0.1)
+        self.b_spin = QtWidgets.QDoubleSpinBox()
+        self.b_spin.setRange(0.0, 1.0)
+        self.b_spin.setValue(1.0)
+        self.b_spin.setSingleStep(0.1)
+        self.a_spin = QtWidgets.QDoubleSpinBox()
+        self.a_spin.setRange(0.0, 1.0)
+        self.a_spin.setValue(1.0)
+        self.a_spin.setSingleStep(0.1)
+        for lbl, spin in (("R", self.r_spin), ("G", self.g_spin),
+                          ("B", self.b_spin), ("A", self.a_spin)):
+            color_row.addWidget(QtWidgets.QLabel(lbl))
+            color_row.addWidget(spin)
+        color_row.addStretch(1)
+        il.addLayout(color_row)
+
+        row2 = QtWidgets.QHBoxLayout()
+        row2.setSpacing(10)
+        b_inject = QtWidgets.QPushButton("حقن اللون وتحويل إلى CFT")
+        b_inject.setObjectName("accent")
+        b_inject.setCursor(QtGui.Qt.CursorShape.PointingHandCursor)
+        b_inject.clicked.connect(self.do_inject)
+        row2.addStretch(1)
+        row2.addWidget(b_inject)
+        il.addLayout(row2)
+        il.addStretch(1)
+        tabs.addTab(inject_tab, "حقن الألوان")
+
+        # ── Classify tab ─────────────────────────────────────────────────
+        cls_tab = QtWidgets.QWidget()
+        cl = QtWidgets.QVBoxLayout(cls_tab)
+        cl.setSpacing(10)
+        cl.setContentsMargins(16, 16, 16, 16)
+        row3 = QtWidgets.QHBoxLayout()
+        self.cls_edit = QtWidgets.QLineEdit()
+        self.cls_edit.setPlaceholderText("ملف .wft / .cft للتصنيف...")
+        self.cls_edit.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        b_pick2 = QtWidgets.QPushButton("استعراض")
+        b_pick2.clicked.connect(self.pick_classify)
+        row3.addWidget(self.cls_edit, 1)
+        row3.addWidget(b_pick2)
+        cl.addLayout(row3)
+
+        b_cls = QtWidgets.QPushButton("تصنيف القطع")
+        b_cls.setObjectName("primary")
+        b_cls.setCursor(QtGui.Qt.CursorShape.PointingHandCursor)
+        b_cls.clicked.connect(self.do_classify)
+        cl.addWidget(b_cls)
+
+        self.cls_result = QtWidgets.QPlainTextEdit()
+        self.cls_result.setReadOnly(True)
+        self.cls_result.setPlaceholderText("ستظهر نتائج التصنيف هنا...")
+        cl.addWidget(self.cls_result, 1)
+        tabs.addTab(cls_tab, "تصنيف القطع")
+
+        # ── Shader hash tab ──────────────────────────────────────────────
+        hash_tab = QtWidgets.QWidget()
+        hl = QtWidgets.QVBoxLayout(hash_tab)
+        hl.setSpacing(10)
+        hl.setContentsMargins(16, 16, 16, 16)
+        row4 = QtWidgets.QHBoxLayout()
+        self.hash_edit = QtWidgets.QLineEdit()
+        self.hash_edit.setPlaceholderText("اسم الشيدر (مثال: texturesampler)...")
+        self.hash_edit.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        b_hash = QtWidgets.QPushButton("احسب الهاش")
+        b_hash.setObjectName("accent")
+        b_hash.clicked.connect(self.do_hash)
+        row4.addWidget(self.hash_edit, 1)
+        row4.addWidget(b_hash)
+        hl.addLayout(row4)
+        self.hash_result = QtWidgets.QLabel("")
+        self.hash_result.setObjectName("card")
+        self.hash_result.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        hl.addWidget(self.hash_result)
+        hl.addStretch(1)
+        tabs.addTab(hash_tab, "حاسبة الهاش")
+
+        root.addWidget(tabs, 1)
+
+    def pick_wft(self):
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "اختر ملف WFT", self.win.game_dir,
+            "WFT (*.wft);;All (*)")
+        if path:
+            self.wft_edit.setText(path)
+
+    def pick_classify(self):
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "اختر ملف", self.win.game_dir,
+            "GTA IV (*.wft *.cft);;All (*)")
+        if path:
+            self.cls_edit.setText(path)
+
+    def do_inject(self):
+        path = self.wft_edit.text().strip()
+        if not path or not os.path.isfile(path):
+            QtWidgets.QMessageBox.warning(self, "تنبيه", "اختر ملف WFT أولاً")
+            return
+        out, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "احفظ CFT المحقون", os.path.splitext(path)[0] + ".cft",
+            "PS3 CFT (*.cft)")
+        if not out:
+            return
+        tint = (self.r_spin.value(), self.g_spin.value(),
+                self.b_spin.value(), self.a_spin.value())
+
+        def job():
+            wft = wftmod.WftFile.load(path)
+            result = wft.inject_tint(tint)
+            cft = wft.to_ps3()
+            return result, cft
+
+        def ok(res):
+            result, cft = res
+            with open(out, "wb") as fh:
+                fh.write(cft)
+            msg = "تم الحقن بنجاح!\n"
+            msg += "إعادة تسمية الشيدرز: %d\n" % len(result["renamed"])
+            for old, new in result["renamed"]:
+                msg += "  %s → %s\n" % (old, new)
+            msg += "نقاط اللون المعدّلة: %d" % result["patched"]
+            self.win.status("تم حقن اللون في %s" % os.path.basename(out))
+            QtWidgets.QMessageBox.information(self, "تم", msg)
+
+        run_async(self, job, ok, busy="جارٍ الحقن...")
+
+    def do_classify(self):
+        path = self.cls_edit.text().strip()
+        if not path or not os.path.isfile(path):
+            QtWidgets.QMessageBox.warning(self, "تنبيه", "اختر ملفاً أولاً")
+            return
+
+        def job():
+            with open(path, "rb") as fh:
+                data = fh.read()
+            rsc = rscmod.RscFile.from_bytes(data, path)
+            dec = rsc.decompressed
+            if len(dec) < 0x70:
+                raise ValueError("ملف صغير جداً")
+            import struct as st
+            drawable_table_off = st.unpack_from("<I", dec, 0x14)[0] & 0x0FFFFFFF
+            drawable_count = st.unpack_from("<I", dec, 0x18)[0]
+            if drawable_count > 0x100:
+                raise ValueError("عدد drawables غير صالح")
+            return tintmod.classify_drawables(dec, drawable_table_off, drawable_count)
+
+        def ok(cats):
+            lines = []
+            for cat, items in cats.items():
+                if items:
+                    lines.append("=== %s (%d) ===" % (cat, len(items)))
+                    for idx, name in items:
+                        lines.append("  [%d] %s" % (idx, name))
+                    lines.append("")
+            self.cls_result.setPlainText("\n".join(lines) if lines else "لا توجد نتائج")
+            self.win.status("تم التصنيف")
+
+        run_async(self, job, ok, busy="جارٍ التصنيف...")
+
+    def do_hash(self):
+        name = self.hash_edit.text().strip()
+        if not name:
+            return
+        h = tintmod.fnv_shader_hash(name)
+        self.hash_result.setText(
+            "<b>%s</b><br>"
+            "<span style='font-family:Consolas'>0x%08X</span> (%d)" %
+            (name, h, h))
+
+
 class ManifestPage(QtWidgets.QWidget):
     def __init__(self, win):
         super().__init__()
         self.win = win
         root = QtWidgets.QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
+        root.setContentsMargins(32, 28, 32, 28)
         root.setSpacing(12)
         title = QtWidgets.QLabel("الفهرسة")
         title.setObjectName("title")
@@ -1065,11 +1545,55 @@ class ManifestPage(QtWidgets.QWidget):
         run_async(self, job, ok, busy="جارٍ الفهرسة (قد تستغرق دقيقة)...",)
 
 
+class AboutPage(QtWidgets.QWidget):
+    def __init__(self, win):
+        super().__init__()
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(32, 28, 32, 28)
+        root.setSpacing(16)
+        title = QtWidgets.QLabel("حول التطبيق")
+        title.setObjectName("title")
+        sub = QtWidgets.QLabel("GTAIV Mod Kit — أداة تعديل GTA IV PS3")
+        sub.setObjectName("subtitle")
+        root.addWidget(title)
+        root.addWidget(sub)
+
+        card = QtWidgets.QLabel()
+        card.setObjectName("card")
+        card.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        card.setText(
+            "<h2 style='color:%s'>GTAIV Mod Kit v%s</h2>"
+            "<p>أداة متكاملة لتعديل GTA IV على PS3 — تحويل المحاكمة والقوام، "
+            "إدارة الأرشيفات، حقن الألوان، وتصنيف القطع.</p>"
+            "<p><b>الميزات الجديدة في هذا الإصدار:</b></p>"
+            "<ul>"
+            "<li>RGXA pack/unpack — حاوية موارد RageX</li>"
+            "<li>حقن الألوان (tint) في المجسمات WFT</li>"
+            "<li>تصنيف القطع: زجاج / باب / نافذة / هيكل</li>"
+            "<li>حاسبة هاش الشيدرز (FNV-like)</li>"
+            "</ul>"
+            "<p style='color:%s'>تم بناؤه بناءً على نتائج فك شفرة "
+            "محوّل RageX (GTAIV_Converter_by_TEAM_RageX)</p>"
+            % (GOLD, APP_VERSION, MUTED))
+        root.addWidget(card)
+
+        changelog = QtWidgets.QLabel()
+        changelog.setObjectName("card")
+        changelog.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        changelog.setText(
+            "<b style='color:%s'>سجل التحديثات:</b><br><br>"
+            "<b>v2.0.0</b> — RGXA، حقن الألوان، التصنيف، حاسبة الهاش<br>"
+            "<b>v1.0.0</b> — الإصدار الأول: RPF/IMG، WTD↔CTD، DDS، GUI عربي"
+            % GOLD)
+        root.addWidget(changelog)
+        root.addStretch(1)
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(APP_NAME)
-        self.setMinimumSize(1020, 680)
+        self.setWindowTitle("%s v%s" % (APP_NAME, APP_VERSION))
+        self.setMinimumSize(1080, 720)
         settings = QtCore.QSettings("gtaivkit", "GTAIVModKit")
         self.game_dir = settings.value("game_dir", DEFAULT_GAME)
         central = QtWidgets.QWidget()
@@ -1080,7 +1604,8 @@ class MainWindow(QtWidgets.QMainWindow):
         hbox.setSpacing(0)
         self.pages = QtWidgets.QStackedWidget()
         nav = [("الرئيسية",), ("الأرشيفات",), ("السيارات",),
-               ("التحويل والمستكشف",), ("الفهرسة",)]
+               ("التحويل والمستكشف",), ("الحقن والتصنيف",), ("الفهرسة",),
+               ("حول",)]
         self.sidebar = Sidebar([(k, k) for k, in nav], self.nav)
         hbox.addWidget(self.sidebar)
         hbox.addWidget(self.pages, 1)
@@ -1088,12 +1613,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.archives = ArchivesPage(self)
         self.cars = CarsPage(self)
         self.convert = ConvertPage(self)
+        self.tint_page = TintPage(self)
         self.manifest = ManifestPage(self)
+        self.about = AboutPage(self)
         for p in (self.home, self.archives, self.cars, self.convert,
-                  self.manifest):
+                  self.tint_page, self.manifest, self.about):
             self.pages.addWidget(p)
         self.setStatusBar(QtWidgets.QStatusBar())
-        self.status("جاهز — مرحباً بك في GTAIV Mod Kit")
+        self.status("جاهز — مرحباً بك في GTAIV Mod Kit v%s" % APP_VERSION)
         self.pages.currentChanged.connect(self._page_changed)
 
     def nav(self, idx):

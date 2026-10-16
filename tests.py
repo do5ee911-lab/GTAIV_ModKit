@@ -333,12 +333,15 @@ def test_cli_e2e():
         if os.path.exists(PC_IMG):
             pcwtd = os.path.join(td, "admiral_pc.wtd")
             pc = imgmod.ImgArchive(PC_IMG)
+            blob = pc.read("admiral.wtd")
             with open(pcwtd, "wb") as fh:
-                fh.write(pc.read("admiral.wtd"))
+                fh.write(blob)
+            n_tex = len(wtdmod.parse(
+                rscmod.RscFile.from_bytes(blob).decompressed, False))
             r = run("inspect", pcwtd)
             check("cli inspect wtd",
                   r.returncode == 0 and "Platform: PC" in r.stdout
-                  and "Textures: 4" in r.stdout, r.stderr[:300])
+                  and ("Textures: %d" % n_tex) in r.stdout, r.stderr[:300])
             ctd_out = os.path.join(td, "admiral_new.ctd")
             r = run("convert", pcwtd, ctd_out)
             check("cli convert wtd",
@@ -349,7 +352,7 @@ def test_cli_e2e():
             n_dds = (len([f for f in os.listdir(texdir) if f.endswith(".dds")])
                      if os.path.isdir(texdir) else 0)
             check("cli tex extract",
-                  r.returncode == 0 and n_dds == 4, r.stderr[:300])
+                  r.returncode == 0 and n_dds == n_tex, r.stderr[:300])
 
 
 def test_rsc_flags():
@@ -484,14 +487,15 @@ def test_convert_wtd_wft():
         return
     pc = imgmod.ImgArchive(PC_IMG)
     wtd = pc.read("admiral.wtd")
+    pc_texs = wtdmod.parse(rscmod.RscFile.from_bytes(wtd).decompressed, False)
     ctd = wtdmod.convert_to_ctd(wtd)
     rsc = rscmod.RscFile.from_bytes(ctd)
     texs = wtdmod.parse(rsc.decompressed, True, rsc.system_size)
     check("convert wtd->ctd",
-          rsc.is_ps3 and rsc.type == 7 and len(texs) == 4
+          rsc.is_ps3 and rsc.type == 7 and len(texs) == len(pc_texs)
+          and len(texs) > 0
           and rsc.system_size % 4096 == 0,
           "type=%d tex=%d sys=%d" % (rsc.type, len(texs), rsc.system_size))
-    pc_texs = wtdmod.parse(rscmod.RscFile.from_bytes(wtd).decompressed, False)
     same_names = [t.name for t in texs] == [t.name for t in pc_texs]
     faithful = all(
         a.pixel_data is not None and a.pixel_data == b.pixel_data
@@ -503,11 +507,14 @@ def test_convert_wtd_wft():
     dec = rsc.decompressed
     tex_off = wtdmod.ptr_offset(struct.unpack_from(">I", dec, 24)[0])
     o = wtdmod.ptr_offset(struct.unpack_from(">I", dec, tex_off)[0])
+    fmt0 = pc_texs[0].format
+    b20 = 0x86 if fmt0.startswith("DXT1") else (
+        0x87 if fmt0.startswith("DXT3") else 0x88)
     struct_ok = (
         struct.unpack_from(">I", dec, o)[0] == 0xEC896300
         and struct.unpack_from("<I", dec, o + 16)[0]
         == len(pc_texs[0].pixel_data)
-        and dec[o + 20] == 0x88 and dec[o + 21] == pc_texs[0].mip_count
+        and dec[o + 20] == b20 and dec[o + 21] == pc_texs[0].mip_count
         and struct.unpack_from(">I", dec, o + 24)[0] == 0xAAE4
         and struct.unpack_from(">I", dec, o + 32)[0] == 0x00010000)
     check("convert ctd struct matches game layout", struct_ok,
@@ -695,6 +702,99 @@ def test_rebuild():
         check("rebuild img subset", True, "skipped: no vehicles.img")
 
 
+def test_convert_archive():
+    from gtaivkit import batch as batchmod
+    ps3 = os.path.join(GAME, "ps3", "models", "cdimages", "vehicles.img")
+    if not (os.path.exists(ps3) and os.path.exists(PC_IMG)):
+        check("convert archive", True, "skipped: missing vehicles.img")
+        return
+    retail = imgmod.ImgArchive(ps3)
+    pc = imgmod.ImgArchive(PC_IMG)
+    with tempfile.TemporaryDirectory() as td:
+        work = os.path.join(td, "vehicles.img")
+        shutil.copy2(ps3, work)
+        tex_out = os.path.join(td, "tex.img")
+        rep = batchmod.convert_archive(work, PC_IMG, only=["admiral"],
+                                       textures_only=True,
+                                       out_path=tex_out, backup=False,
+                                       max_dec_bytes=None)
+        check("convert-archive textures-only report",
+              rep["written"] and rep["converted"] == 1
+              and rep["textures"] == 1 and rep["meshes"] == 0
+              and rep["kept"] == 1
+              and rep["size_before"] == os.path.getsize(work)
+              and rep["size_after"] == os.path.getsize(tex_out),
+              str({k: rep[k] for k in
+                   ("written", "converted", "textures", "meshes", "kept")}))
+        new = imgmod.ImgArchive(tex_out)
+        expect_ctd = wtdmod.convert_to_ctd(pc.read("admiral.wtd"))
+        check("convert-archive texture equals single convert",
+              new.read("admiral.ctd") == expect_ctd
+              and new.read("admiral.cft") == retail.read("admiral.cft")
+              and new.read("banshee.ctd") == retail.read("banshee.ctd")
+              and [e.name for e in new.entries]
+              == [e.name for e in retail.entries],
+              "order/name mismatch or content changed")
+
+        full_out = os.path.join(td, "full.img")
+        rep2 = batchmod.convert_archive(work, PC_IMG, only=["admiral"],
+                                        textures_only=False,
+                                        out_path=full_out, backup=False,
+                                        max_dec_bytes=None)
+        full = imgmod.ImgArchive(full_out)
+        cft = rscmod.RscFile.from_bytes(full.read("admiral.cft"))
+        wft = wftmod.WftFile.from_bytes(pc.read("admiral.wft"))
+        check("convert-archive full mode",
+              rep2["converted"] == 2 and rep2["textures"] == 1
+              and rep2["meshes"] == 1
+              and cft.is_ps3 and cft.type == 117
+              and cft.decompressed == wft.decompressed
+              and full.read("banshee.cft") == retail.read("banshee.cft"),
+              "converted=%d meshes=%d type=%d" % (
+                  rep2["converted"], rep2["meshes"], cft.type))
+        lines = "\n".join(batchmod.report_lines(rep2))
+        check("convert-archive report sizes",
+              "archive size:" in lines and "58." in lines
+              and "converted:" in lines,
+              lines[:200])
+
+        try:
+            batchmod.convert_archive(PC_IMG, work, textures_only=True,
+                                     backup=False)
+            check("convert-archive rejects PC as PS3", False, "no error")
+        except ValueError as exc:
+            check("convert-archive rejects PC as PS3",
+                  ".ctd/.cft" in str(exc), str(exc)[:120])
+        try:
+            batchmod.convert_archive(work, PC_IMG, out_path=PC_IMG,
+                                     only=["admiral"], textures_only=True,
+                                     backup=False)
+            check("convert-archive refuses overwrite PC source",
+                  False, "no error")
+        except ValueError as exc:
+            check("convert-archive refuses overwrite PC source",
+                  "PC source" in str(exc), str(exc)[:120])
+        try:
+            batchmod.convert_archive(work, PC_IMG,
+                                     only=["zzz_not_a_car"],
+                                     textures_only=True, backup=False)
+            check("convert-archive rejects bad --only", False, "no error")
+        except ValueError as exc:
+            check("convert-archive rejects bad --only",
+                  "--only" in str(exc), str(exc)[:120])
+        skip_out = os.path.join(td, "skip.img")
+        rep3 = batchmod.convert_archive(work, PC_IMG, only=["admiral"],
+                                        textures_only=True,
+                                        out_path=skip_out, backup=False,
+                                        max_dec_bytes=1000)
+        check("convert-archive skips oversized dict",
+              not rep3["written"] and rep3["converted"] == 0
+              and rep3["skipped"] == 1
+              and rep3["files"][0]["status"] == "skipped-too-big"
+              and not os.path.exists(skip_out),
+              str({k: rep3[k] for k in ("written", "converted", "skipped")}))
+
+
 def main():
     print("== key ==")
     test_key()
@@ -725,6 +825,8 @@ def main():
     test_dds_export()
     print("== convert ==")
     test_convert_wtd_wft()
+    print("== convert archive (direct, no unpack) ==")
+    test_convert_archive()
     print("== rpf3/img3 formats ==")
     test_rpf3_audio()
     test_img3_plaintext()

@@ -4,6 +4,7 @@ import zlib
 from .rsc import (MAGIC_PS3, RscError, TYPE_TEXTURE_PS3, encode_flags,
                   hash_name, make_ptr, pad_size_for_flags, ptr_offset,
                   swap_u32)
+from . import tint as tintmod
 
 DICT_MAGIC = 0xCCC36100
 TEX_MAGIC = 0xEC896300
@@ -145,8 +146,6 @@ def parse(dec, is_ps3, system_size=0):
             if not size:
                 size = estimate_pixel_size(t.width, t.height, t.format,
                                            t.mip_count)
-            # game pointers are relative to the system segment end; older
-            # builds of this tool wrote absolute offsets
             for base in (system_size + gpu_off, gpu_off):
                 if base >= 0 and size > 0 and base + size <= len(dec):
                     t.pixel_data = dec[base:base + size]
@@ -288,16 +287,16 @@ def dds_export(tex):
     fourcc = {"DXT1": 0x31545844, "DXT3": 0x33545844}.get(
         (tex.format or "DXT5")[:4], 0x35545844)
     out = bytearray()
-    out += st.pack("<I", 0x20534444)          # 'DDS '
-    out += st.pack("<I", 124)                 # dwSize
-    out += st.pack("<I", 0x81007)             # CAPS|HEIGHT|WIDTH|PIXELFORMAT|LINEARSIZE
+    out += st.pack("<I", 0x20534444)
+    out += st.pack("<I", 124)
+    out += st.pack("<I", 0x81007)
     out += st.pack("<IIII", tex.height, tex.width, len(px), 0)
     out += st.pack("<I", mips)
     out += b"\x00" * 44
-    out += st.pack("<II", 32, 4)              # ddspf: size, DDPF_FOURCC
+    out += st.pack("<II", 32, 4)
     out += st.pack("<I", fourcc)
-    out += st.pack("<IIIII", 0, 0, 0, 0, 0)   # bitcount, r, g, b, a masks
-    out += st.pack("<IIIII", 4096, 0, 0, 0, 0)  # caps TEXTURE, caps2-4, reserved2
+    out += st.pack("<IIIII", 0, 0, 0, 0, 0)
+    out += st.pack("<IIIII", 4096, 0, 0, 0, 0)
     if len(out) != 128:
         raise ValueError("bad DDS header size: %d" % len(out))
     out += px

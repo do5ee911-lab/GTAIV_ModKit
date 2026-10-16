@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(2, 0, 0, 0),
+    prodvers=(2, 0, 0, 0),
     mask=0x3F,
     flags=0x0,
     OS=0x40004,
@@ -14,13 +14,13 @@ VSVersionInfo(
     StringFileInfo([
       StringTable('040904B0', [
         StringStruct('CompanyName', 'GTAIV Mod Kit'),
-        StringStruct('FileDescription', 'GTA IV PS3 archive and car mod toolkit'),
-        StringStruct('FileVersion', '1.0.0.0'),
+        StringStruct('FileDescription', 'GTA IV PS3 archive, car mod & tint toolkit'),
+        StringStruct('FileVersion', '2.0.0.0'),
         StringStruct('InternalName', 'gtaivkit'),
         StringStruct('LegalCopyright', 'gtaivkit'),
         StringStruct('OriginalFilename', 'gtaivkit.exe'),
         StringStruct('ProductName', 'GTAIV Mod Kit'),
-        StringStruct('ProductVersion', '1.0.0.0')
+        StringStruct('ProductVersion', '2.0.0.0')
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
